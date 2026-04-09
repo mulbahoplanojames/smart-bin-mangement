@@ -1,5 +1,10 @@
-"use client"
-import type { Bin } from "@/hooks/useDashboardData"
+"use client";
+
+import type { Bin } from "@/hooks/useDashboardData";
+import dynamic from "next/dynamic";
+import { useState } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { FiPlus, FiMinus, FiMapPin, FiImage } from "react-icons/fi";
 
 const STATUS_COLOR: Record<string, string> = {
   Empty:    "#10b981",
@@ -7,21 +12,28 @@ const STATUS_COLOR: Record<string, string> = {
   Full:     "#f59e0b",
   Overflow: "#ef4444",
   Offline:  "#6b7280",
-}
+};
 
-const STATUS_GLOW: Record<string, string> = {
-  Empty:    "rgba(16,185,129,0.5)",
-  Medium:   "rgba(251,191,36,0.5)",
-  Full:     "rgba(245,158,11,0.5)",
-  Overflow: "rgba(239,68,68,0.5)",
-  Offline:  "rgba(107,114,128,0.3)",
-}
+// Dynamic import for the Map component
+const MapComponent = dynamic(
+  () => import("@/components/dashboard/MapComponent"),
+  { 
+    ssr: false,
+    loading: () => <Skeleton className="h-full w-full rounded-2xl bg-[#07080a]" />
+  }
+);
 
 interface LiveBinOverviewProps {
-  bins?: Bin[]
+  bins?: Bin[];
 }
 
 export function LiveBinOverview({ bins = [] }: LiveBinOverviewProps) {
+  const [viewMode, setViewMode] = useState<"dark" | "satellite">("dark");
+  const [zoom, setZoom] = useState(13);
+
+  const handleZoomIn = () => setZoom(prev => Math.min(prev + 1, 20));
+  const handleZoomOut = () => setZoom(prev => Math.max(prev - 1, 1));
+
   return (
     <div className="bg-[#11131a] border border-[#1e2029]/60 p-8 rounded-[2rem] h-full flex flex-col group hover:bg-[#1a1c25] hover:border-[#10b981]/30 transition-all duration-500 cursor-default">
       {/* Header */}
@@ -37,78 +49,55 @@ export function LiveBinOverview({ bins = [] }: LiveBinOverviewProps) {
         </span>
       </div>
 
-      {/* Map */}
+      {/* Actual Leaflet Map Container */}
       <div className="flex-1 w-full rounded-3xl overflow-hidden border border-[#1e2029]/80 relative bg-[#0a0b0f] shadow-2xl min-h-[320px]">
-        <div className="w-full h-full bg-[#07080a] flex items-center justify-center relative">
-          {/* Background map texture */}
-          <div
-            className="absolute inset-0 opacity-40 grayscale contrast-125"
-            style={{
-              backgroundImage: 'url("https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png")',
-              backgroundSize: "cover",
-              backgroundBlendMode: "multiply",
-            }}
-          />
-
-          {/* If bins exist, show each as a positioned marker */}
-          {bins.length > 0 ? (
-            bins.map((bin) => {
-              const color = STATUS_COLOR[bin.status] ?? "#10b981"
-              const glow  = STATUS_GLOW[bin.status]  ?? "rgba(16,185,129,0.5)"
-              return (
-                <div key={bin.id} className="relative group/bin">
-                  {/* Pulse ring */}
-                  {bin.status !== "Offline" && (
-                    <div
-                      className="w-16 h-16 rounded-full animate-ping absolute -left-4 -top-4"
-                      style={{ backgroundColor: `${color}20` }}
-                    />
-                  )}
-                  {/* Dot */}
-                  <div
-                    className="w-10 h-10 rounded-full border-2 flex items-center justify-center relative cursor-pointer"
-                    style={{
-                      backgroundColor: `${color}30`,
-                      borderColor: color,
-                      boxShadow: `0 0 20px ${glow}`,
-                    }}
-                  >
-                    <div
-                      className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: color, boxShadow: `0 0 15px ${color}` }}
-                    />
-                    {/* Tooltip */}
-                    <div className="absolute -top-14 left-1/2 -translate-x-1/2 bg-[#11131a] border border-[#1e2029] px-3 py-2 rounded-xl shadow-2xl whitespace-nowrap opacity-0 group-hover/bin:opacity-100 transition-opacity z-10">
-                      <p className="text-white text-[11px] font-black uppercase tracking-widest">{bin.id}</p>
-                      <p className="text-gray-400 text-[10px] font-bold mt-0.5 truncate max-w-[140px]">{bin.location}</p>
-                      <p className="text-[10px] font-black mt-0.5" style={{ color }}>
-                        {bin.fillLevel}% — {bin.status}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )
-            })
-          ) : (
-            // Default Kigali marker when no bins are in DB yet
-            <div className="relative">
-              <div className="w-20 h-20 bg-[#10b981]/20 rounded-full animate-ping absolute -left-6 -top-6" />
-              <div className="w-10 h-10 bg-[#10b981]/30 rounded-full border-2 border-[#10b981] flex items-center justify-center relative shadow-[0_0_20px_rgba(16,185,129,0.5)]">
-                <div className="w-4 h-4 bg-[#10b981] rounded-full shadow-[0_0_15px_#10b981]" />
-                <div className="absolute -top-12 bg-[#11131a] border border-[#1e2029] px-3 py-1.5 rounded-lg shadow-2xl whitespace-nowrap">
-                  <span className="text-white text-[10px] font-black uppercase tracking-widest">Kigali</span>
-                </div>
-              </div>
+        <div className="w-full h-full relative">
+          <MapComponent bins={bins} viewMode={viewMode} zoom={zoom} />
+          
+          {/* Map Controls Overlays */}
+          <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
+            {/* View Mode Switcher */}
+            <div className="bg-[#11131a]/80 backdrop-blur-md border border-[#1e2029] rounded-xl p-1 flex flex-col gap-1 shadow-2xl">
+              <button 
+                onClick={() => setViewMode("dark")}
+                className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${viewMode === "dark" ? "bg-[#10b981] text-white shadow-[0_0_10px_#10b981]" : "text-gray-500 hover:text-white"}`}
+                title="Dark View"
+              >
+                <FiMapPin size={16} />
+              </button>
+              <button 
+                onClick={() => setViewMode("satellite")}
+                className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${viewMode === "satellite" ? "bg-[#10b981] text-white shadow-[0_0_10px_#10b981]" : "text-gray-500 hover:text-white"}`}
+                title="Satellite View"
+              >
+                <FiImage size={16} />
+              </button>
             </div>
-          )}
 
-          {/* City label watermark */}
-          <div className="absolute bottom-8 right-8 pointer-events-none">
-            <span className="text-[32px] text-white/5 font-black tracking-[0.3em] uppercase select-none">KIGALI</span>
+            {/* Zoom Controls */}
+            <div className="bg-[#11131a]/80 backdrop-blur-md border border-[#1e2029] rounded-xl p-1 flex flex-col gap-1 shadow-2xl">
+              <button 
+                onClick={handleZoomIn}
+                className="w-9 h-9 hover:bg-white/5 text-gray-500 hover:text-white rounded-lg flex items-center justify-center transition-all"
+                title="Zoom In"
+              >
+                <FiPlus size={16} />
+              </button>
+              <button 
+                onClick={handleZoomOut}
+                className="w-9 h-9 hover:bg-white/5 text-gray-500 hover:text-white rounded-lg flex items-center justify-center transition-all"
+                title="Zoom Out"
+              >
+                <FiMinus size={16} />
+              </button>
+            </div>
           </div>
 
-          <div className="absolute bottom-4 right-4 bg-black/60 px-3 py-1.5 rounded-lg text-[9px] text-gray-700 font-black border border-white/5 backdrop-blur-xl">
-            Leaflet | © CARTO
+          {/* Location Watermark */}
+          <div className="absolute bottom-6 left-6 z-[1000] pointer-events-none">
+             <div className="bg-[#11131a]/40 backdrop-blur-md border border-white/5 px-4 py-2 rounded-xl shadow-2xl">
+                <span className="text-[18px] text-white/10 font-black tracking-[0.5em] uppercase select-none">KIGALI</span>
+             </div>
           </div>
         </div>
       </div>
@@ -120,9 +109,9 @@ export function LiveBinOverview({ bins = [] }: LiveBinOverviewProps) {
             const count = bins.filter((b) => b.status === status).length
             if (count === 0) return null
             return (
-              <div key={status} className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
-                <span className="text-gray-500 text-[11px] font-bold uppercase tracking-widest">
+              <div key={status} className="flex items-center gap-2 px-3 py-1.5 bg-[#1e2029]/30 rounded-xl border border-white/5">
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                <span className="text-gray-500 text-[10px] font-black uppercase tracking-widest leading-none">
                   {status} ({count})
                 </span>
               </div>
@@ -131,5 +120,5 @@ export function LiveBinOverview({ bins = [] }: LiveBinOverviewProps) {
         </div>
       )}
     </div>
-  )
+  );
 }
