@@ -1,243 +1,160 @@
-  <h1>Project Documentation</h1>
-        <h2>Overview</h2>
-        <p>
-          This project is a web application built using React and React Router.
-          The application features multiple pages, routes, and components,
-          designed to provide a comprehensive user experience for both visitors
-          and authenticated users, including students and administrators.
-        </p>
+# Smart Waste Management Dashboard - Database Setup
 
-  <h2>Table of Contents</h2>
+Copy and paste the following SQL commands into your Supabase **SQL Editor** to create the tables, relationships, and basic Row Level Security (RLS) policies.
 
-  <ul>
-          <li>Installation</li>
-          <li>Project Structure</li>
-          <li>Routing</li>
-          <li>Components and Pages</li>
-          <li>Admin Features</li>
-          <li>User Authentication</li>
-          <li>Additional Features</li>
-          <li>Contributing</li>
-          <li>License</li>
-  </ul>
+## 1. Create Tables
+This section creates the required tables based on your schema expectations.
 
-  <h2>Installation</h2>
-        <span>To run this project locally, follow these steps:</span>
-   <ul>
-        <li>
-            Clone the repository:
-            <span>git clone https://github.com/mulbahoplanojames/Harmony_Coalition_Project.git</span>
-          </li>
-        <li>
-            Navigate to the project directory:
-            <span>cd your-repo-name</span>
-          </li>
-        <li>
-            Install the dependencies:
-            <span>npm install</span>
-          </li>
-        <li>
-            Start the development server:
-            <span>npm run dev</span>
-          </li>
-  </ul>
+```sql
+-- Enable UUID extension just in case it's not enabled by default
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-  <h2>Project Structure</h2>
-   <ul>
-        <li>src/</li>
-        <l1>
-          |-- Admin/
-          <ul>
-            <li>-- Admin_Layout/</li>
-            <li>-- Add_Events/</li>
-            <li>-- Add_Student/</li>
-            <li>-- Admin_Login/</li>
-            <li>-- Edit_Student/</li>
-            <li>-- Send_NewsLetter/</li>
-            <li>--Student_List/</li>
-          </ul>
-        </l1>
-        <l1>
-          |-- Components/
-          <ul>
-            <li>-- Scroll_To_Top/</li>
-            <li>-- Sponsers/</li>
-          </ul>
-        </l1>
-        <l1>
-          |-- User_Component/
-          <ul>
-            <li>-- User_NewsLetter_Confirm/</li>
-            <li>-- Context/</li>
-          </ul>
-        </l1>
-        <l1>
-          |-- Depaerments_Details/
-          <ul>
-            <li>-- Computer_Science/</li>
-            <li>-- EBS/</li>
-            <li>-- Law/</li>
-            <li>-- Polythenic_Institute/</li>
-          </ul>
-        </l1>
-        <l1>
-          |-- Layout/
-          <ul>
-            <li>-- Pages/</li>
-            <li>-- Home/</li>
-            <li>-- About/</li>
-            <li>-- Contact_Us/</li>
-            <li>-- Enrollment/</li>
-            <li>-- ForgetPassword/</li>
-            <li>-- Log_In/</li>
-            <li>-- Page_Not_Found/</li>
-            <li>-- Reset_Password/</li>
-            <li>-- Sign_Up/</li>
-            <li>-- Student_Profile/</li>
-            <li>-- Student_Profile_settings/</li>
-            <li>-- Visit_Pages/</li>
-          </ul>
-        </l1>
-        <li>-- App.js</li>
-        <li>-- index.js</li>
-      </ul>
+-- ==========================================
+-- 1. USERS TABLE
+-- ==========================================
+-- We link this table to the Supabase auth.users table via trigger below.
+CREATE TABLE public.users (
+  id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+  name TEXT,
+  email TEXT UNIQUE NOT NULL,
+  role TEXT CHECK (role IN ('admin', 'staff', 'driver')) DEFAULT 'staff',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
 
-<!--//? ================================================================================================== -->
+-- ==========================================
+-- 2. BINS TABLE
+-- ==========================================
+CREATE TABLE public.bins (
+  id TEXT PRIMARY KEY, -- E.g., 'BIN-001'
+  location TEXT NOT NULL,
+  latitude DOUBLE PRECISION NOT NULL,
+  longitude DOUBLE PRECISION NOT NULL,
+  "fillLevel" INTEGER DEFAULT 0 CHECK ("fillLevel" >= 0 AND "fillLevel" <= 100),
+  status TEXT CHECK (status IN ('Empty', 'Medium', 'Full', 'Overflow', 'Offline')) DEFAULT 'Empty',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
 
-  <h2>Routing </h2>
-      <p>
-        The routing for this application is managed using react-router-dom.
-        Below is an overview of the routing structure:
-      </p>
+-- ==========================================
+-- 3. COLLECTIONS TABLE
+-- ==========================================
+CREATE TABLE public.collections (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  "driverId" UUID REFERENCES public.users(id) ON DELETE SET NULL,
+  route TEXT NOT NULL,
+  "wasteCollected" DOUBLE PRECISION DEFAULT 0.0,
+  status TEXT CHECK (status IN ('Pending', 'Completed')) DEFAULT 'Pending',
+  timestamp TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
 
-### Main Pages
+-- ==========================================
+-- 4. ALERTS TABLE
+-- ==========================================
+CREATE TABLE public.alerts (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  type TEXT CHECK (type IN ('Bin Overflow', 'Sensor Offline', 'Collection Delay', 'Other')) NOT NULL,
+  priority TEXT CHECK (priority IN ('High', 'Medium', 'Low')) DEFAULT 'Medium',
+  "binId" TEXT REFERENCES public.bins(id) ON DELETE CASCADE,
+  status TEXT CHECK (status IN ('Active', 'Acknowledged', 'Resolved')) DEFAULT 'Active',
+  timestamp TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+```
 
-      <ul>
-        <li>: Home</li>
-        <li>/about: About</li>
-        <li>/enrollment: Enrollment</li>
-        <li>/contact-us: Contact Us</li>
-        <li>/student_profile_settings: Student Profile Settings</li>
-        <li>/student_profile: Student Profile</li>
-        <li>/school-of-science-technology: Science and Technology</li>
-        <li>/school-of-ebs: School of EBS</li>
-        <li>/school-of-law-social-sciences: Law</li>
-      </ul>
+## 2. Supabase Auth Trigger
+This trigger automatically creates a user in `public.users` whenever a new user signs up in `auth.users` via Supabase authentication.
 
-### Admin Pages
+```sql
+-- Create a function to handle new user signups
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.users (id, email, name, role)
+  VALUES (
+    new.id,
+    new.email,
+    new.raw_user_meta_data->>'name',
+    COALESCE(new.raw_user_meta_data->>'role', 'staff') -- Default role is 'staff'
+  );
+  RETURN new;
+END;
+$$;
 
-      <ul>
-        <li>/admin/: Admin Layout</li>
-        <li>/admin/add-student: Add Student</li>
-        <li>/admin/edit-student: Edit Student</li>
-        <li>/admin/send-newsletter: Send Newsletter</li>
-        <li>/admin/add-events: Add Events</li>
-      </ul>
+-- Create the trigger on auth.users
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+```
 
-  <h3>Visitor Pages</h3>
-      <ul>
-        <li>/home: Visit Home</li>
-        <li>/visit-about: Visit About</li>
-        <li>/visit-contact-us: Visit Contact Us</li>
-        <li>
-          /visit-school-of-science-technology: Visit Science and Technology
-        </li>
-        <li>/visit-school-of-social-sciences-and-law: Visit Law</li>
-        <li>/visit-school-of-ebs: Visit School of EBS</li>
-        <li>/visit-polytechnic-instutute: Visit Polytechnic Institute</li>
-        <li>/visit-sponsership: Sponsors</li>
-      </ul>
+## 3. Enable Row-Level Security (RLS)
+The following script enables RLS on all tables and creates standard access policies based on roles.
 
-  <h3>Authentication and User Management</h3>
-      <ul>
-        <li>/sign-up: Sign Up</li>
-        <li>/log-in: Log In</li>
-        <li>/admin/log-in: Admin Log In</li>
-        <li>/forget-password: Forget Password</li>
-        <li>/:id/:token/reset-password/: Reset Password</li>
-        <li>/:id/:token/: User Component</li>
-        <li>newsletter/confirm/:id/:number/: Confirm Newsletter</li>
-      </ul>
+```sql
+-- Enable RLS on all tables
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bins ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.collections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.alerts ENABLE ROW LEVEL SECURITY;
 
-  <h3>Error Pages</h3>
-      <ul>
-        <li>: Page Not Found</li>
-      </ul>
+-- ==========================================
+-- RLS POLICIES FOR 'users'
+-- ==========================================
+-- Everyone can read users (for dashboard display purposes)
+CREATE POLICY "Users are viewable by everyone" ON public.users FOR SELECT USING (true);
+-- Only users themselves or admins can update their profile
+CREATE POLICY "Users can update own profile" ON public.users FOR UPDATE USING (auth.uid() = id);
 
-<!--//? ================================================================================================ -->
+-- ==========================================
+-- RLS POLICIES FOR 'bins'
+-- ==========================================
+-- Everyone can view bins
+CREATE POLICY "Bins are viewable by everyone" ON public.bins FOR SELECT USING (true);
+-- Only admins can insert or delete bins
+CREATE POLICY "Only admins can insert bins" ON public.bins FOR INSERT WITH CHECK (
+  EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+);
+CREATE POLICY "Only admins can delete bins" ON public.bins FOR DELETE USING (
+  EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+);
+-- Admins and IoT API (service role) can update bins. Assuming authenticated users can update (or API routes bypass RLS).
+CREATE POLICY "Authenticated users can update bins" ON public.bins FOR UPDATE USING (auth.role() = 'authenticated');
 
-  <h2> Components and Pages</h2>
+-- ==========================================
+-- RLS POLICIES FOR 'collections'
+-- ==========================================
+CREATE POLICY "Collections are viewable by authenticated users" ON public.collections FOR SELECT USING (auth.role() = 'authenticated');
+-- Only admins can assign collections
+CREATE POLICY "Only admins can insert collections" ON public.collections FOR INSERT WITH CHECK (
+  EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+);
+-- Drivers can update their own collections (e.g., mark as Completed), Admins can update all.
+CREATE POLICY "Drivers can update own collections, admins can update all" ON public.collections FOR UPDATE USING (
+  "driverId" = auth.uid() OR
+  EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+);
 
-  <h3>Main Pages</h3>
+-- ==========================================
+-- RLS POLICIES FOR 'alerts'
+-- ==========================================
+CREATE POLICY "Alerts are viewable by authenticated users" ON public.alerts FOR SELECT USING (auth.role() = 'authenticated');
+-- Any authenticated user (or IoT handler) can insert alerts
+CREATE POLICY "Authenticated users can insert alerts" ON public.alerts FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+-- Staff and Admins can update alerts (e.g., acknowledge them)
+CREATE POLICY "Staff and Admins can update alerts" ON public.alerts FOR UPDATE USING (
+  EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'staff'))
+);
+```
 
-  <ul>
-        <li>Home: The landing page of the application.</li>
-        <li>About: Information about the institution.</li>
-        <li>Enrollment: Enrollment procedures and details.</li>
-        <li>Contact Us: Contact information and form.</li>
-        <li>Student Profile Settings: Manage student profile settings.</li>
-        <li>Student Profile: View student profile.</li>
-        <li>
-          Science and Technology: Information about the School of Science and
-          Technology.
-        </li>
-        <li>School of EBS: Information about the School of EBS.</li>
-        <li>Law: Information about the School of Law and Social Sciences.</li>
-  </ul>
+## 4. Setting up Realtime subscriptions (Optional but recommended for IoT)
+To allow Next.js to listen to real-time changes (e.g. changing bin colors instantly on the map).
 
-  <h3>Visitor Pages</h3>
-
-   <ul>
-        <li>Visit Home: Landing page for visitors.</li>
-        <li>Visit About: Information for visitors.</li>
-        <li>Visit Contact Us: Contact information for visitors.</li>
-        <li>
-          Visit Science and Technology: School of Science and Technology
-          information for visitors.
-        </li>
-        <li>Visit Law: School of Law information for visitors.</li>
-        <li>Visit School of EBS: School of EBS information for visitors.</li>
-        <li>
-          Visit Polytechnic Institute: Polytechnic Institute information for
-          visitors.
-        </li>
-        <li>Sponsors: Information about sponsors.</li>
-  </ul>
-
-  <h3>Admin Features</h3>
-
-  <ul>
-        <li>Admin Layout: Main layout for admin pages.</li>
-        <li>Student List: View and manage the list of students.</li>
-        <li>Add Student: Add a new student to the system.</li>
-        <li>Edit Student: Edit an existing student's details.</li>
-        <li>Send Newsletter: Send newsletters to users.</li>
-        <li>Add Events: Add new events to the system.</li>
-   </ul>
-
-  <h3>User Authentication</h3>
-
-  <ul>
-        <li>
-          The application includes comprehensive user authentication features:
-        </li>
-        <li>Sign Up: User registration.</li>
-        <li>Log In: User login.</li>
-        <li>Admin Log In: Admin login.</li>
-        <li>Forget Password: Password recovery process.</li>
-        <li>Reset Password: Password reset functionality.</li>
-        <li>User Component: Verifies if a user's account is active.</li>
-        <li>
-          Confirm Newsletter: Confirms user email verification for newsletters.
-        </li>
-  </ul>
-
-   <h3>Additional Features</h3>
-
-   <ul>
-        <li>
-          Scroll to Top: A component to automatically scroll to the top of the
-          page on route change.
-        </li>
-        <li>Sponsors: Display sponsors' information.</li>
-   </ul>
+```sql
+-- Enable real-time for bins and alerts
+BEGIN;
+  DROP PUBLICATION IF EXISTS supabase_realtime;
+  CREATE PUBLICATION supabase_realtime;
+COMMIT;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.bins;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.alerts;
+```
