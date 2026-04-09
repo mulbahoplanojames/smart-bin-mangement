@@ -36,11 +36,11 @@ export default function DispatchTasksPage() {
 
   const fetchData = async () => {
     try {
-      // 1. Fetch critical bins (Full or Overflow)
+      // 1. Fetch critical bins (Full or Overflow OR fillLevel >= 90)
       const { data: binsData } = await supabase
         .from("bins")
         .select("*")
-        .in("status", ["Full", "Overflow"]);
+        .or(`status.in.(Full,Overflow),"fillLevel".gte.90`);
       
       // 2. Fetch drivers
       const { data: driversData } = await supabase
@@ -239,7 +239,7 @@ export default function DispatchTasksPage() {
                       <div className="flex items-center gap-3">
                         <div className="w-24 h-2 bg-[#1e2029] rounded-full overflow-hidden">
                           <div 
-                            className={`h-full rounded-full ${bin.fillLevel > 90 ? 'bg-[#ef4444]' : 'bg-[#f59e0b]'}`}
+                            className={`h-full rounded-full ${bin.fillLevel >= 90 ? 'bg-[#ef4444]' : 'bg-[#f59e0b]'}`}
                             style={{ width: `${bin.fillLevel}%` }}
                           />
                         </div>
@@ -248,8 +248,10 @@ export default function DispatchTasksPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${bin.status === "Overflow" ? "bg-[#ef4444]" : "bg-[#f59e0b]"} animate-pulse`} />
-                        <span className={`text-[10px] font-black uppercase tracking-widest ${bin.status === "Overflow" ? "text-[#ef4444]" : "text-[#f59e0b]"}`}>{bin.status}</span>
+                        <div className={`w-2 h-2 rounded-full ${bin.fillLevel >= 90 ? "bg-[#ef4444]" : "bg-[#f59e0b]"} animate-pulse`} />
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${bin.fillLevel >= 90 ? "text-[#ef4444]" : "text-[#f59e0b]"}`}>
+                          {bin.fillLevel >= 90 ? "Critical" : "Warning"}
+                        </span>
                       </div>
                     </TableCell>
                   </TableRow>
