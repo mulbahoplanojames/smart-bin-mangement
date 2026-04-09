@@ -6,13 +6,7 @@ import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FiPlus, FiMinus, FiMapPin, FiImage } from "react-icons/fi";
 
-const STATUS_COLOR: Record<string, string> = {
-  Empty:    "#10b981",
-  Medium:   "#fbbf24",
-  Full:     "#f59e0b",
-  Overflow: "#ef4444",
-  Offline:  "#6b7280",
-};
+import { getStatusColor } from "./MapComponent"
 
 // Dynamic import for the Map component
 const MapComponent = dynamic(
@@ -34,6 +28,21 @@ export function LiveBinOverview({ bins = [] }: LiveBinOverviewProps) {
   const handleZoomIn = () => setZoom(prev => Math.min(prev + 1, 20));
   const handleZoomOut = () => setZoom(prev => Math.max(prev - 1, 1));
 
+  // Compute status counts for the legend using the new logic
+  const stats = {
+    Safe: bins.filter(b => b.status !== "Offline" && b.fillLevel < 50).length,
+    Warning: bins.filter(b => b.status !== "Offline" && b.fillLevel >= 50 && b.fillLevel < 90).length,
+    Critical: bins.filter(b => b.status !== "Offline" && b.fillLevel >= 90).length,
+    Offline: bins.filter(b => b.status === "Offline").length,
+  };
+
+  const LEGEND = [
+    { label: "Safe", color: "#10b981", count: stats.Safe },
+    { label: "Warning", color: "#f59e0b", count: stats.Warning },
+    { label: "Critical", color: "#ef4444", count: stats.Critical },
+    { label: "Offline", color: "#6b7280", count: stats.Offline },
+  ];
+
   return (
     <div className="bg-[#11131a] border border-[#1e2029]/60 p-8 rounded-[2rem] h-full flex flex-col group hover:bg-[#1a1c25] hover:border-[#10b981]/30 transition-all duration-500 cursor-default">
       {/* Header */}
@@ -54,9 +63,8 @@ export function LiveBinOverview({ bins = [] }: LiveBinOverviewProps) {
         <div className="w-full h-full relative">
           <MapComponent bins={bins} viewMode={viewMode} zoom={zoom} />
           
-          {/* Map Controls Overlays */}
+          {/* Map Controls */}
           <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
-            {/* View Mode Switcher */}
             <div className="bg-[#11131a]/80 backdrop-blur-md border border-[#1e2029] rounded-xl p-1 flex flex-col gap-1 shadow-2xl">
               <button 
                 onClick={() => setViewMode("dark")}
@@ -73,52 +81,31 @@ export function LiveBinOverview({ bins = [] }: LiveBinOverviewProps) {
                 <FiImage size={16} />
               </button>
             </div>
-
-            {/* Zoom Controls */}
             <div className="bg-[#11131a]/80 backdrop-blur-md border border-[#1e2029] rounded-xl p-1 flex flex-col gap-1 shadow-2xl">
-              <button 
-                onClick={handleZoomIn}
-                className="w-9 h-9 hover:bg-white/5 text-gray-500 hover:text-white rounded-lg flex items-center justify-center transition-all"
-                title="Zoom In"
-              >
+              <button onClick={handleZoomIn} className="w-9 h-9 hover:bg-white/5 text-gray-500 hover:text-white rounded-lg flex items-center justify-center transition-all">
                 <FiPlus size={16} />
               </button>
-              <button 
-                onClick={handleZoomOut}
-                className="w-9 h-9 hover:bg-white/5 text-gray-500 hover:text-white rounded-lg flex items-center justify-center transition-all"
-                title="Zoom Out"
-              >
+              <button onClick={handleZoomOut} className="w-9 h-9 hover:bg-white/5 text-gray-500 hover:text-white rounded-lg flex items-center justify-center transition-all">
                 <FiMinus size={16} />
               </button>
             </div>
           </div>
-
-          {/* Location Watermark */}
-          <div className="absolute bottom-6 left-6 z-[1000] pointer-events-none">
-             <div className="bg-[#11131a]/40 backdrop-blur-md border border-white/5 px-4 py-2 rounded-xl shadow-2xl">
-                <span className="text-[18px] text-white/10 font-black tracking-[0.5em] uppercase select-none">KIGALI</span>
-             </div>
-          </div>
         </div>
       </div>
 
-      {/* Legend */}
-      {bins.length > 0 && (
-        <div className="flex flex-wrap gap-4 mt-6">
-          {Object.entries(STATUS_COLOR).map(([status, color]) => {
-            const count = bins.filter((b) => b.status === status).length
-            if (count === 0) return null
-            return (
-              <div key={status} className="flex items-center gap-2 px-3 py-1.5 bg-[#1e2029]/30 rounded-xl border border-white/5">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-                <span className="text-gray-500 text-[10px] font-black uppercase tracking-widest leading-none">
-                  {status} ({count})
-                </span>
-              </div>
-            )
-          })}
-        </div>
-      )}
+      {/* New Dynamic Legend */}
+      <div className="flex flex-wrap gap-4 mt-6">
+        {LEGEND.map((item) => (
+          item.count > 0 && (
+            <div key={item.label} className="flex items-center gap-2 px-3 py-1.5 bg-[#1e2029]/30 rounded-xl border border-white/5">
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+              <span className="text-gray-500 text-[10px] font-black uppercase tracking-widest leading-none">
+                {item.label} ({item.count})
+              </span>
+            </div>
+          )
+        ))}
+      </div>
     </div>
   );
 }

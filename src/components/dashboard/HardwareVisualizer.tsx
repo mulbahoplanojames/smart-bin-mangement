@@ -17,11 +17,11 @@ export function HardwareVisualizer({ bin, allBins = [] }: HardwareVisualizerProp
   const serialNumber = activeBin?.id ?? "SN-00000";
   const status = activeBin?.status ?? "Empty"
 
-  const fillColor =
-    fillLevel >= 80 ? "#ef4444" :
-    fillLevel >= 60 ? "#f59e0b" :
-    fillLevel >= 40 ? "#fbbf24" :
-    "#10b981"
+  const fillColor = 
+    status === "Offline" ? "#6b7280" :
+    fillLevel >= 90 ? "#ef4444" : // Critical
+    fillLevel >= 50 ? "#f59e0b" : // Warning
+    "#10b981"; // Safe
 
   return (
     <div className="bg-[#11131a] border border-[#1e2029]/60 p-8 rounded-[2rem] w-full relative overflow-hidden group hover:bg-[#1a1c25] hover:border-[#10b981]/30 transition-all duration-500">

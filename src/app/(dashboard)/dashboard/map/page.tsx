@@ -41,9 +41,9 @@ export default function LiveMapPage() {
         {/* Legend / Status Toggles */}
         <div className="flex flex-wrap items-center gap-3 bg-[#11131a]/50 p-2 rounded-2xl border border-[#1e2029]/60">
           {[
-            { label: "Safe", color: "#10b981" },
-            { label: "Warning", color: "#fbbf24" },
-            { label: "Critical", color: "#ef4444" },
+            { label: "Safe (<50%)", color: "#10b981" },
+            { label: "Warning (50-89%)", color: "#fbbf24" },
+            { label: "Critical (≥90%)", color: "#ef4444" },
             { label: "Dispatched", color: "#3b82f6" },
           ].map((status) => (
             <div key={status.label} className="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-white/5 cursor-pointer transition-colors group">

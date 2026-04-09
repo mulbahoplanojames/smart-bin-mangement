@@ -38,12 +38,11 @@ interface MapComponentProps {
   zoom: number;
 }
 
-const STATUS_COLORS = {
-  Empty: "#10b981",
-  Medium: "#fbbf24",
-  Full: "#f59e0b",
-  Overflow: "#ef4444",
-  Offline: "#6b7280",
+export const getStatusColor = (fillLevel: number, status?: string) => {
+  if (status === "Offline") return "#6b7280";
+  if (fillLevel >= 90) return "#ef4444"; // Critical (Red)
+  if (fillLevel >= 50) return "#f59e0b"; // Warning (Orange)
+  return "#10b981"; // Safe (Green)
 };
 
 const TILES = {
@@ -80,7 +79,7 @@ export default function MapComponent({ bins, viewMode, zoom }: MapComponentProps
       <MapController center={center} zoom={zoom} layerType={viewMode} />
 
       {bins.map((bin) => {
-        const color = STATUS_COLORS[bin.status] || "#10b981";
+        const color = getStatusColor(bin.fillLevel, bin.status);
         
         return (
           <Marker
