@@ -10,6 +10,9 @@ This section creates the required tables based on your schema expectations.
 -- Enable UUID extension just in case it's not enabled by default
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Create an enum type for user roles to ensure consistency
+CREATE TYPE public.user_role AS ENUM ('admin', 'staff', 'driver');
+
 -- ==========================================
 -- 1. USERS TABLE
 -- ==========================================
@@ -18,7 +21,7 @@ CREATE TABLE public.users (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   name TEXT,
   email TEXT UNIQUE NOT NULL,
-  role TEXT CHECK (role IN ('admin', 'staff', 'driver')) DEFAULT 'staff',
+  role public.user_role DEFAULT 'staff',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -77,7 +80,7 @@ BEGIN
     new.id,
     new.email,
     new.raw_user_meta_data->>'name',
-    COALESCE(new.raw_user_meta_data->>'role', 'staff') -- Default role is 'staff'
+    CAST(COALESCE(new.raw_user_meta_data->>'role', 'staff') AS public.user_role) -- Cast to enum type
   );
   RETURN new;
 END;
