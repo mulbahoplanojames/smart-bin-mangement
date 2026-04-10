@@ -10,20 +10,36 @@ import {
 import { createClient } from "@/utils/supabase/client"
 
 // ─── Navigation config ────────────────────────────────────────────────────────
-const SIDEBAR_ITEMS = [
+type Role = "admin" | "staff" | "driver";
+
+interface SidebarItem {
+  name: string;
+  href: string;
+  icon: any;
+  roles?: Role[]; // If omitted, visible to everyone
+}
+
+interface SidebarGroup {
+  group: string;
+  roles?: Role[]; // If omitted, all roles can potentially see the group (depending on items)
+  items: SidebarItem[];
+}
+
+const SIDEBAR_ITEMS: SidebarGroup[] = [
   {
     group: "MAIN",
     items: [
       { name: "Dashboard",       href: "/dashboard",           icon: FiGrid },
       { name: "Live Map",        href: "/dashboard/map",       icon: FiMap },
-      { name: "Analytics",       href: "/dashboard/analytics", icon: FiBarChart2 },
-      { name: "Register Device", href: "/dashboard/register",  icon: FiPlusSquare },
-      { name: "Alerts",          href: "/dashboard/alerts",    icon: FiBell },
-      { name: "Dispatch Tasks",  href: "/dashboard/dispatch",  icon: FiTruck },
+      { name: "Analytics",       href: "/dashboard/analytics", icon: FiBarChart2, roles: ["admin", "staff"] },
+      { name: "Register Device", href: "/dashboard/register",  icon: FiPlusSquare, roles: ["admin"] },
+      { name: "Alerts",          href: "/dashboard/alerts",    icon: FiBell, roles: ["admin", "staff"] },
+      { name: "Dispatch Tasks",  href: "/dashboard/dispatch",  icon: FiTruck, roles: ["admin"] },
     ],
   },
   {
     group: "STAFF MANAGEMENT",
+    roles: ["admin"],
     items: [
       { name: "Admins",  href: "/dashboard/admins",  icon: FiUsers },
       { name: "Staff",   href: "/dashboard/staff",   icon: FiUsers },
@@ -33,7 +49,7 @@ const SIDEBAR_ITEMS = [
   {
     group: "SYSTEM",
     items: [
-      { name: "Reports",  href: "/dashboard/reports",  icon: FiFileText },
+      { name: "Reports",  href: "/dashboard/reports",  icon: FiFileText, roles: ["admin", "staff"] },
       { name: "Settings", href: "/dashboard/settings", icon: FiSettings },
     ],
   },
@@ -63,7 +79,7 @@ function SidebarContent({
     : (user.email?.[0] ?? "U").toUpperCase()
 
   const displayName = user.name ?? user.email ?? "Loading…"
-  const displayRole = user.role ?? "staff"
+  const displayRole = (user.role ?? "staff") as Role
 
   return (
     <div className="flex flex-col h-full">
@@ -80,47 +96,59 @@ function SidebarContent({
       {/* Navigation — scrollable area */}
       <div className="flex-1 overflow-y-auto min-h-0 px-4 pb-4">
         <nav>
-          {SIDEBAR_ITEMS.map((section, idx) => (
-            <div key={idx} className="mb-8">
-              <p className="text-[10px] font-black text-gray-700 mb-4 ml-4 tracking-[0.2em] uppercase">
-                {section.group}
-              </p>
-              <div className="flex flex-col gap-1">
-                {section.items.map((item) => {
-                  const isActive = pathname === item.href
-                  const Icon = item.icon
-                  return (
-                    <Link key={item.name} href={item.href} onClick={onLinkClick}>
-                      <div
-                        className={`flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer transition-all duration-200 group ${
-                          isActive
-                            ? "bg-[#10b981]/10 text-white border border-[#10b981]/20"
-                            : "text-gray-500 hover:bg-white/5 hover:text-gray-300"
-                        }`}
-                      >
-                        <Icon
-                          size={20}
-                          className={
+          {SIDEBAR_ITEMS.map((section, idx) => {
+            // Filter section by role
+            if (section.roles && !section.roles.includes(displayRole)) return null;
+
+            // Filter items by role
+            const visibleItems = section.items.filter(
+              (item) => !item.roles || item.roles.includes(displayRole)
+            );
+
+            if (visibleItems.length === 0) return null;
+
+            return (
+              <div key={idx} className="mb-8">
+                <p className="text-[10px] font-black text-gray-700 mb-4 ml-4 tracking-[0.2em] uppercase">
+                  {section.group}
+                </p>
+                <div className="flex flex-col gap-1">
+                  {visibleItems.map((item) => {
+                    const isActive = pathname === item.href
+                    const Icon = item.icon
+                    return (
+                      <Link key={item.name} href={item.href} onClick={onLinkClick}>
+                        <div
+                          className={`flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer transition-all duration-200 group ${
                             isActive
-                              ? "text-[#10b981]"
-                              : "text-gray-600 group-hover:text-gray-300 transition-colors"
-                          }
-                        />
-                        <span className={`text-sm ${isActive ? "font-[800]" : "font-[600]"}`}>
-                          {item.name}
-                        </span>
-                        {item.href === "/dashboard/alerts" && isActive && (
-                          <span className="ml-auto bg-[#ef4444] text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">
-                            Live
+                              ? "bg-[#10b981]/10 text-white border border-[#10b981]/20"
+                              : "text-gray-500 hover:bg-white/5 hover:text-gray-300"
+                          }`}
+                        >
+                          <Icon
+                            size={20}
+                            className={
+                              isActive
+                                ? "text-[#10b981]"
+                                : "text-gray-600 group-hover:text-gray-300 transition-colors"
+                            }
+                          />
+                          <span className={`text-sm ${isActive ? "font-[800]" : "font-[600]"}`}>
+                            {item.name}
                           </span>
-                        )}
-                      </div>
-                    </Link>
-                  )
-                })}
+                          {item.href === "/dashboard/alerts" && isActive && (
+                            <span className="ml-auto bg-[#ef4444] text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">
+                              Live
+                            </span>
+                          )}
+                        </div>
+                      </Link>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </nav>
 
         {/* Logout */}

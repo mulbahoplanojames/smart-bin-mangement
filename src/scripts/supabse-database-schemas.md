@@ -165,3 +165,11 @@ COMMIT;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.bins;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.alerts;
 ```
+
+<!-- -- 1) Drop the dependent trigger on auth.users -->
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+
+<!-- -- 2) Drop the function (now no dependencie  s remain) -->
+
+DROP FUNCTION IF EXISTS handle_new_user();
